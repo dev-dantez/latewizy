@@ -11,7 +11,7 @@ export function useLate(): Late | null {
 
   const client = useMemo(() => {
     if (!apiKey) return null;
-    return new Late({ apiKey });
+    return new Late({ apiKey, baseURL: "https://zernio.com/api" });
   }, [apiKey]);
 
   return client;

@@ -59,8 +59,10 @@ export default function AccountsPage() {
       if (data?.authUrl) {
         window.location.href = data.authUrl;
       }
-    } catch {
-      toast.error("Failed to start connection. Please try again.");
+    } catch (err) {
+      const msg = (err as Error)?.message || "Failed to start connection. Please try again.";
+      toast.error(msg);
+      console.error("Connect error:", err);
     }
   };
 
