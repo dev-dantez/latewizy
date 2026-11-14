@@ -25,6 +25,7 @@ import {
   Calendar,
   Users,
   ListOrdered,
+  Layers,
   Settings,
   Moon,
   Sun,
@@ -59,6 +60,11 @@ const navItems = [
     label: "Queue",
     href: "/dashboard/queue",
     icon: ListOrdered,
+  },
+  {
+    label: "Brands",
+    href: "/dashboard/brands",
+    icon: Layers,
   },
 ];
 
