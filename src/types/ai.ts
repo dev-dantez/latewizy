@@ -8,6 +8,7 @@
 
 import type { Platform, PlatformSpecificData } from "@/lib/late-api";
 import type { MediaItem, PlatformPost } from "@/hooks/use-posts";
+import type { SavedBrand } from "./brand";
 
 // ============================================================================
 // Brand Configuration
@@ -111,7 +112,7 @@ export interface GeneratedPostDraft {
   generatedAt: string; // ISO timestamp
   status: "draft" | "approved" | "scheduled" | "discarded";
   scheduledFor?: string; // ISO timestamp, set when approved + scheduled
-  brandSnapshot: BrandProfile; // snapshot of brand context used
+  brandSnapshot: BrandProfile | SavedBrand; // snapshot of brand context used
 }
 
 /**

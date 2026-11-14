@@ -80,3 +80,12 @@ export {
   type QueueSlot,
   type QueueSchedule,
 } from "./use-queue";
+
+// Brands
+export {
+  useBrands,
+  useBrand,
+  useBrandActions,
+  type UseBrandsReturn,
+  type UseBrandActionsReturn,
+} from "./use-brands";

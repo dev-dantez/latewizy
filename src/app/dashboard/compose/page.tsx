@@ -169,7 +169,7 @@ export default function ComposePage() {
                 setContent(variantContent + hashtagStr);
               }}
               onAddMedia={(url) => {
-                setMedia((prev) => [...prev, { url, type: "image" }]);
+                setMedia((prev) => [...prev, { url, type: "image" as const, filename: url.split("/").pop() ?? "image", contentType: "image/jpeg" }]);
               }}
             />
           )}

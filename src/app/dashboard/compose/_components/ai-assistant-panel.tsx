@@ -11,7 +11,7 @@
  * - Rate-limit feedback (Retry-After header shown to user)
  */
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,10 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { CACHE_DURATIONS, CACHE_KEYS } from "@/lib/ai/constants";
+import { buildImageSearchTerms, buildImagePromptContext } from "@/lib/ai/brand-context";
+import { useBrands } from "@/hooks/use-brands";
+import { toBrandProfile } from "@/types/brand";
+import { BrandSelector } from "@/app/dashboard/brands/_components/brand-selector";
 import type { ContentVariant, StockImage } from "@/types/ai";
 import type { Platform } from "@/lib/late-api";
 
@@ -57,7 +61,7 @@ interface BrandContext {
   defaultCTA: string;
 }
 
-const DEFAULT_BRAND: BrandContext = {
+const ANONYMOUS_BRAND: BrandContext = {
   brandName: "My Brand",
   description: "A social media presence",
   tone: "professional",
@@ -306,6 +310,11 @@ function ImageCard({ image, onSelect }: { image: StockImage; onSelect: (url: str
 export function AIAssistantPanel({ platform, onUseVariant, onAddMedia }: AIPanelProps) {
   const queryClient = useQueryClient();
 
+  // Brand store
+  const { selectedBrand, defaultBrand } = useBrands();
+  const activeBrand = selectedBrand ?? defaultBrand;
+  const brandContext = activeBrand ? toBrandProfile(activeBrand) : ANONYMOUS_BRAND;
+
   // Content gen state
   const [topic, setTopic] = useState("");
   const [numVariants, setNumVariants] = useState(3);
@@ -327,9 +336,22 @@ export function AIAssistantPanel({ platform, onUseVariant, onAddMedia }: AIPanel
     true
   );
 
+  // Auto-populate image search query from brand + topic when query is empty
+  useEffect(() => {
+    if (!topic.trim() || imageQuery.trim()) return;
+    if (!activeBrand) return;
+    const suggested = buildImageSearchTerms(activeBrand, topic);
+    if (suggested) setImageQuery(suggested);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topic, activeBrand?.id]);
+
+  // Pre-fill image gen prompt placeholder from brand visual context
+  const brandImageContext =
+    activeBrand && !genPrompt ? buildImagePromptContext(activeBrand) : "";
+
   const handleGenerate = () => {
     if (!topic.trim()) return;
-    generate(topic, platform, DEFAULT_BRAND, numVariants);
+    generate(topic, platform, brandContext, numVariants);
   };
 
   const handleImageSearch = () => {
@@ -371,6 +393,7 @@ export function AIAssistantPanel({ platform, onUseVariant, onAddMedia }: AIPanel
         {/* ── Write tab ── */}
         <TabsContent value="write" className="p-4 space-y-3 mt-0">
           <div className="space-y-2">
+            <BrandSelector />
             <Textarea
               placeholder={`What's this post about? e.g. "new product launch for summer sale"`}
               value={topic}
@@ -503,7 +526,7 @@ export function AIAssistantPanel({ platform, onUseVariant, onAddMedia }: AIPanel
         <TabsContent value="generate-image" className="p-4 space-y-3 mt-0">
           <div className="space-y-2">
             <Textarea
-              placeholder={`Describe the image… e.g. "minimalist flat lay of coffee and laptop, warm tones"`}
+              placeholder={brandImageContext || `Describe the image… e.g. "minimalist flat lay of coffee and laptop, warm tones"`}
               value={genPrompt}
               onChange={(e) => setGenPrompt(e.target.value)}
               rows={2}

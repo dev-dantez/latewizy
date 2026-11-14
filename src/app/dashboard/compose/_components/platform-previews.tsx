@@ -35,7 +35,7 @@ function usePreviewSize() {
   return useContext(PreviewSizeContext);
 }
 
-const SUPPORTED_PREVIEWS: PreviewPlatform[] = ["twitter", "linkedin", "instagram"];
+const SUPPORTED_PREVIEWS: PreviewPlatform[] = ["twitter", "linkedin", "instagram", "facebook"];
 
 const SYSTEM_FONT =
   "font-[-apple-system,BlinkMacSystemFont,'Segoe_UI',Roboto,'Helvetica_Neue',Arial,sans-serif]";
@@ -137,6 +137,7 @@ function PreviewCard({
           {platform === "twitter" && <XPreview account={account} content={content} media={media} />}
           {platform === "linkedin" && <LinkedInPreview account={account} content={content} media={media} />}
           {platform === "instagram" && <InstagramPreview account={account} content={content} media={media} />}
+          {platform === "facebook" && <FacebookPreview account={account} content={content} media={media} />}
         </div>
       </div>
       {content.length > 0 && (
@@ -575,8 +576,166 @@ function LinkedInPreview({ account, content, media }: PreviewProps) {
 }
 
 // ============================================================
-// Instagram Preview
+// Facebook Preview
 // ============================================================
+
+function FacebookMediaGrid({ media }: { media: PreviewProps["media"] }) {
+  if (media.length === 0) return null;
+  if (media.length === 1) {
+    return (
+      <div className="overflow-hidden" style={{ maxHeight: "476px" }}>
+        <MediaItem src={media[0].url} type={media[0].type} autoPlay={media[0].type === "video"} />
+      </div>
+    );
+  }
+  if (media.length === 2) {
+    return (
+      <div className="grid grid-cols-2 gap-0.5">
+        {media.slice(0, 2).map((m, i) => (
+          <div key={i} className="overflow-hidden" style={{ aspectRatio: "1/1" }}>
+            <MediaItem src={m.url} type={m.type} />
+          </div>
+        ))}
+      </div>
+    );
+  }
+  if (media.length === 3) {
+    return (
+      <div className="grid grid-cols-2 gap-0.5">
+        <div className="col-span-2 overflow-hidden" style={{ aspectRatio: "16/9" }}>
+          <MediaItem src={media[0].url} type={media[0].type} />
+        </div>
+        {media.slice(1, 3).map((m, i) => (
+          <div key={i} className="overflow-hidden" style={{ aspectRatio: "1/1" }}>
+            <MediaItem src={m.url} type={m.type} />
+          </div>
+        ))}
+      </div>
+    );
+  }
+  if (media.length === 4) {
+    return (
+      <div className="grid grid-cols-2 gap-0.5">
+        {media.slice(0, 4).map((m, i) => (
+          <div key={i} className="overflow-hidden" style={{ aspectRatio: "1/1" }}>
+            <MediaItem src={m.url} type={m.type} />
+          </div>
+        ))}
+      </div>
+    );
+  }
+  // 5+ photos: 2 large on top, 3 smaller below with +N overlay
+  const remaining = media.length - 5;
+  return (
+    <div className="grid grid-cols-6 gap-0.5">
+      {media.slice(0, 2).map((m, i) => (
+        <div key={i} className="col-span-3 overflow-hidden" style={{ aspectRatio: "1/1" }}>
+          <MediaItem src={m.url} type={m.type} />
+        </div>
+      ))}
+      {media.slice(2, 5).map((m, i) => (
+        <div key={i} className="relative col-span-2 overflow-hidden" style={{ aspectRatio: "1/1" }}>
+          <MediaItem src={m.url} type={m.type} />
+          {i === 2 && remaining > 0 && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+              <span className="text-2xl font-bold text-white">+{remaining}</span>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function FacebookPreview({ account, content, media }: PreviewProps) {
+  const previewSize = usePreviewSize();
+  const lines = previewSize === "mobile" ? 3 : media.length > 0 ? 4 : 8;
+
+  return (
+    <div className={`bg-white dark:bg-[#242526] ${SYSTEM_FONT}`}>
+      {/* Header */}
+      <div className="flex items-start justify-between px-4 pt-3 pb-2">
+        <div className="flex items-center gap-2.5">
+          <MockupAvatar src={account.profilePicture} fallback="#1877F2" size={40} />
+          <div>
+            <p className="text-[15px] font-semibold leading-5 text-[#050505] dark:text-[#E3E3E3]">
+              {account.displayName || account.username}
+            </p>
+            <div className="flex items-center gap-1 text-xs text-[#65676B] dark:text-[#B0B3B8]">
+              <span>Just now</span>
+              <span>·</span>
+              <Globe className="h-3 w-3" />
+            </div>
+          </div>
+        </div>
+        <MoreHorizontal className="h-5 w-5 text-[#65676B] dark:text-[#B0B3B8]" />
+      </div>
+
+      {/* Content */}
+      {(content || media.length === 0) && (
+        <div className="px-4 pb-2">
+          <ClampedContent
+            content={content}
+            lines={lines}
+            truncateLabel="See more"
+            truncateColor="text-[#65676B] dark:text-[#B0B3B8]"
+            highlightColor="text-[#1877F2]"
+            className="text-[15px] leading-5 text-[#050505] dark:text-[#E3E3E3] bg-white dark:bg-[#242526]"
+          />
+        </div>
+      )}
+
+      {/* Media */}
+      {media.length > 0 && (
+        <div className="mt-1">
+          <FacebookMediaGrid media={media} />
+        </div>
+      )}
+
+      {/* Reaction summary */}
+      <div className="flex items-center justify-between px-4 py-2 text-[13px] text-[#65676B] dark:text-[#B0B3B8]">
+        <div className="flex items-center gap-1">
+          <span className="flex -space-x-1">
+            {/* Like + Love reaction bubbles */}
+            <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-[#1877F2] text-[10px]">👍</span>
+            <span className="flex h-[18px] w-[18px] items-center justify-center rounded-full bg-[#F33E58] text-[10px]">❤️</span>
+          </span>
+          <span>126</span>
+        </div>
+        <div className="flex gap-2">
+          <span>14 comments</span>
+          <span>·</span>
+          <span>3 shares</span>
+        </div>
+      </div>
+
+      {/* Divider */}
+      <hr className="mx-4 border-[#CED0D4] dark:border-[#3E4042]" />
+
+      {/* Action bar */}
+      <div className="flex items-center px-2 py-1">
+        {[
+          { emoji: "👍", label: "Like" },
+          { icon: MessageCircle, label: "Comment" },
+          { icon: Share, label: "Share" },
+        ].map((item) => (
+          <button
+            key={item.label}
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-2 text-[13px] font-semibold text-[#65676B] hover:bg-[#F2F2F2] dark:text-[#B0B3B8] dark:hover:bg-[#3A3B3C] transition-colors"
+          >
+            {"emoji" in item ? (
+              <span className="text-base">{item.emoji}</span>
+            ) : (
+              <item.icon className="h-[18px] w-[18px]" />
+            )}
+            <span>{item.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 
 function InstagramPreview({ account, content, media }: PreviewProps) {
   return (

@@ -10,6 +10,7 @@
 
 import type { Platform } from "@/lib/late-api";
 import type { BrandProfile, PlatformConstraints } from "@/types/ai";
+import type { SavedBrand } from "@/types/brand";
 import { getPlatformConstraints } from "./platform-validation";
 import { PROMPT_LIMITS } from "./constants";
 
@@ -72,17 +73,16 @@ export function sanitizeUserInput(input: string): string {
 
 /**
  * Build system prompt with brand context and platform constraints.
- * The system prompt sets the AI's role, brand guidelines, tone, voice,
- * target audience, and platform-specific constraints.
- * 
- * @param brand - Brand profile with guidelines and context
+ * Accepts both BrandProfile and SavedBrand (which is a superset).
+ *
+ * @param brand - Brand profile or SavedBrand
  * @param platform - Target social media platform
  * @returns System prompt string (max 4000 characters)
- * 
+ *
  * **Validates: Requirements 7.7, 12.1, 12.2, 12.3, 12.4**
  */
 export function buildSystemPrompt(
-  brand: BrandProfile,
+  brand: BrandProfile | SavedBrand,
   platform: Platform
 ): string {
   const constraints = getPlatformConstraints(platform);
@@ -123,6 +123,24 @@ PLATFORM: ${platform.toUpperCase()} (max ${constraints.maxCharacters} chars, max
   }
   if (constraints.supportsHashtags && sanitizedBrand.hashtags.length > 0) {
     prompt += `BRAND HASHTAGS (use when relevant): ${sanitizedBrand.hashtags.slice(0, constraints.maxHashtags).join(" ")}\n`;
+  }
+
+  // Extended fields from SavedBrand (present only when brand is a SavedBrand)
+  const extended = brand as SavedBrand;
+  if (extended.personality) {
+    prompt += `PERSONALITY: ${sanitizeUserInput(extended.personality)}\n`;
+  }
+  if (extended.niche) {
+    prompt += `NICHE: ${sanitizeUserInput(extended.niche)}\n`;
+  }
+  if (extended.writingStyle) {
+    prompt += `WRITING STYLE: ${sanitizeUserInput(extended.writingStyle)}\n`;
+  }
+  if (extended.contentRestrictions) {
+    prompt += `NEVER (content restrictions): ${sanitizeUserInput(extended.contentRestrictions)}\n`;
+  }
+  if (extended.additionalInstructions) {
+    prompt += `EXTRA INSTRUCTIONS: ${sanitizeUserInput(extended.additionalInstructions)}\n`;
   }
 
   prompt += `
