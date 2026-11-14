@@ -12,7 +12,8 @@ import { PlatformSelector } from "./_components/platform-selector";
 import { MediaUploader } from "./_components/media-uploader";
 import { PlatformPreviews } from "./_components/platform-previews";
 import { SchedulePicker, type ScheduleType } from "./_components/schedule-picker";
-import { Loader2, Send, PenSquare, Users, Calendar, Image as ImageIcon, Eye } from "lucide-react";
+import { AIAssistantPanel } from "./_components/ai-assistant-panel";
+import { Loader2, Send, PenSquare, Users, Calendar, Image as ImageIcon, Eye, Sparkles } from "lucide-react";
 import type { Platform } from "@/lib/late-api";
 import type { Account } from "@/hooks";
 
@@ -30,6 +31,7 @@ export default function ComposePage() {
   const [scheduleType, setScheduleType] = useState<ScheduleType>("now");
   const [scheduledDate, setScheduledDate] = useState<Date>();
   const [scheduledTime, setScheduledTime] = useState("09:00");
+  const [showAI, setShowAI] = useState(false);
 
   const accounts = (accountsData?.accounts || []) as any[];
   const hasVideo = media.some((m) => m.type === "video");
@@ -93,8 +95,13 @@ export default function ComposePage() {
       );
 
       router.push("/dashboard/calendar");
-    } catch {
-      toast.error("Failed to create post. Please try again.");
+    } catch (err) {
+      const msg =
+        (err as { message?: string; error?: string })?.message ||
+        (err as { message?: string; error?: string })?.error ||
+        "Failed to create post. Please try again.";
+      toast.error(msg);
+      console.error("Create post error:", err);
     }
   };
 
@@ -128,7 +135,16 @@ export default function ComposePage() {
               rows={8}
               className="resize-none"
             />
-            <div className="flex justify-end">
+            <div className="flex items-center justify-between">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs text-muted-foreground"
+                onClick={() => setShowAI((v) => !v)}
+              >
+                <Sparkles className="h-3 w-3 mr-1" />
+                {showAI ? "Hide AI" : "AI Assist"}
+              </Button>
               <span
                 className={`text-xs ${
                   charCount > charLimit
@@ -140,6 +156,23 @@ export default function ComposePage() {
               </span>
             </div>
           </div>
+
+          {/* AI Assistant Panel */}
+          {showAI && (
+            <AIAssistantPanel
+              platform={
+                (selectedAccounts[0]?.platform as Platform) ?? "instagram"
+              }
+              onUseVariant={(variantContent, hashtags) => {
+                const hashtagStr =
+                  hashtags.length > 0 ? "\n\n" + hashtags.join(" ") : "";
+                setContent(variantContent + hashtagStr);
+              }}
+              onAddMedia={(url) => {
+                setMedia((prev) => [...prev, { url, type: "image" }]);
+              }}
+            />
+          )}
 
           <div className="rounded-lg bg-muted p-4">
             <div className="flex items-center gap-2 mb-3">

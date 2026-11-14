@@ -13,8 +13,8 @@ This implementation plan breaks down the AI Content Generator feature into discr
   - Set up environment variables in `.env.local` for GROQ_API_KEY and PIXABAY_API_KEY
   - _Requirements: 1.1, 2.1, 3.1, 11.1, 11.2, 14.1, 14.2, 14.3, 14.4_
 
-- [ ] 2. Implement AI Settings Store (Zustand)
-  - [~] 2.1 Create AI Settings Store with persistence
+- [x] 2. Implement AI Settings Store (Zustand)
+  - [x] 2.1 Create AI Settings Store with persistence
     - Create `src/stores/ai-settings-store.ts` implementing AISettingsState interface
     - Use Zustand `persist` middleware with localStorage key "latewiz-ai-settings"
     - Implement setBrandProfile, setGenerationPrefs, setAutoScheduleConfig actions with partial merge logic
@@ -29,7 +29,7 @@ This implementation plan breaks down the AI Content Generator feature into discr
     - Test localStorage persistence and hydration
     - _Requirements: 4.2, 4.3, 4.4, 4.5_
 
-  - [~] 2.3 Add BrandProfile validation to store
+  - [x] 2.3 Add BrandProfile validation to store
     - Validate brandName (non-empty, max 100 chars)
     - Validate tone (non-empty, max 50 chars)
     - Validate hashtags (each starts with "#", max 30 tags)
@@ -43,8 +43,8 @@ This implementation plan breaks down the AI Content Generator feature into discr
     - **Validates: Requirements 4.2, 4.3, 4.4**
     - Test that partial updates preserve all unmodified fields across random inputs
 
-- [ ] 3. Implement prompt construction utilities
-  - [~] 3.1 Create prompt builder functions
+- [x] 3. Implement prompt construction utilities
+  - [x] 3.1 Create prompt builder functions
     - Create `src/lib/ai/prompts.ts`
     - Implement buildSystemPrompt(brand, platform) with brand context and platform constraints
     - Implement buildUserPrompt(topic, tone, constraints, numVariants) with JSON format instructions
@@ -71,8 +71,8 @@ This implementation plan breaks down the AI Content Generator feature into discr
     - **Validates: Requirements 12.5, 12.6, 12.7**
     - Test that buildUserPrompt always returns non-empty string under 2000 chars with all required elements
 
-- [ ] 4. Implement platform validation utilities
-  - [~] 4.1 Create platform constraint functions
+- [x] 4. Implement platform validation utilities
+  - [x] 4.1 Create platform constraint functions
     - Create `src/lib/ai/platform-validation.ts`
     - Implement getPlatformConstraints(platform) returning PlatformConstraints
     - Implement checkPlatformLimits(content, platform) returning boolean (true if within limit)
@@ -97,8 +97,8 @@ This implementation plan breaks down the AI Content Generator feature into discr
     - **Validates: Requirements 11.6, 11.7**
     - Test that checkPlatformLimits returns true iff content length <= platform limit
 
-- [ ] 5. Implement rate limiting system
-  - [~] 5.1 Create rate limiter with in-memory cache
+- [x] 5. Implement rate limiting system
+  - [x] 5.1 Create rate limiter with in-memory cache
     - Create `src/lib/ai/rate-limiter.ts`
     - Implement checkRateLimit(provider, identifier) with Map-based counting
     - Enforce limits: groq=30/60s, pixabay=100/60s, pollinations=10/60s
@@ -119,8 +119,8 @@ This implementation plan breaks down the AI Content Generator feature into discr
     - **Validates: Requirements 8.1, 8.2, 8.4, 8.5, 8.6**
     - Test that rate limiter never allows exceeding the provider-specific limit
 
-- [ ] 6. Implement JSON parsing and fallback utilities
-  - [~] 6.1 Create JSON parsing functions
+- [x] 6. Implement JSON parsing and fallback utilities
+  - [x] 6.1 Create JSON parsing functions
     - Create `src/lib/ai/json-parser.ts`
     - Implement parseJSON(content) extracting JSON from text or markdown code blocks
     - Implement extractContentFallback(content) producing ContentVariant array from raw text
@@ -140,11 +140,11 @@ This implementation plan breaks down the AI Content Generator feature into discr
     - **Validates: Requirements 1.4, 1.5, 9.8, 9.9**
     - Test that parseJSON or fallback always produces valid output from Groq-like responses
 
-- [~] 7. Checkpoint - Core utilities complete
+- [x] 7. Checkpoint - Core utilities complete
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 8. Implement Content Generation API Route
-  - [~] 8.1 Create /api/ai/generate-content route
+- [x] 8. Implement Content Generation API Route
+  - [x] 8.1 Create /api/ai/generate-content route
     - Create `src/app/api/ai/generate-content/route.ts`
     - Validate input with Zod schema (topic, platform, tone, brandContext, numVariants)
     - Check rate limit for "groq" provider using IP from x-forwarded-for
@@ -173,7 +173,7 @@ This implementation plan breaks down the AI Content Generator feature into discr
     - Test that response always contains valid ContentVariants with correct fields
 
 - [ ] 9. Implement Image Search API Route
-  - [~] 9.1 Create /api/ai/search-images route
+  - [-] 9.1 Create /api/ai/search-images route
     - Create `src/app/api/ai/search-images/route.ts`
     - Validate query (non-empty, max 100 chars) and perPage (1-200)
     - Check rate limit for "pixabay" provider
@@ -202,7 +202,7 @@ This implementation plan breaks down the AI Content Generator feature into discr
     - Test that normalized StockImage objects always have required fields and source="pixabay"
 
 - [ ] 10. Implement AI Image Generation API Route
-  - [~] 10.1 Create /api/ai/generate-image route
+  - [-] 10.1 Create /api/ai/generate-image route
     - Create `src/app/api/ai/generate-image/route.ts`
     - Validate prompt (non-empty, max 500 chars), width (256-2048, default 1024), height (256-2048, default 1024), model ("flux" or "turbo", default "flux")
     - Check rate limit for "pollinations" provider
@@ -234,7 +234,7 @@ This implementation plan breaks down the AI Content Generator feature into discr
     - Test that response never contains Pollinations URL or API keys
 
 - [ ] 11. Implement Trending Topics API Route
-  - [~] 11.1 Create /api/ai/trending-topics route
+  - [ ] 11.1 Create /api/ai/trending-topics route
     - Create `src/app/api/ai/trending-topics/route.ts`
     - Validate niche (non-empty, max 200 chars)
     - Check rate limit for "groq" provider
@@ -317,7 +317,7 @@ This implementation plan breaks down the AI Content Generator feature into discr
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 14. Implement AI Hooks (TanStack Query)
-  - [~] 14.1 Create AI hooks
+  - [ ] 14.1 Create AI hooks
     - Create `src/hooks/use-ai.ts`
     - Implement useGenerateContent() mutation hook wrapping /api/ai/generate-content
     - Implement useSearchImages() mutation hook wrapping /api/ai/search-images with 5-minute cache
@@ -464,7 +464,7 @@ This implementation plan breaks down the AI Content Generator feature into discr
     - **Validates: Requirements 7.4, 7.6**
     - Test that sanitized text contains no control chars, null bytes, or injection attempts
 
-  - [~] 19.3 Verify API keys never exposed
+  - [ ] 19.3 Verify API keys never exposed
     - Audit all server routes to ensure GROQ_API_KEY and PIXABAY_API_KEY never in response
     - Audit error messages to ensure no API key echoing
     - _Requirements: 7.1, 7.2, 7.3_
@@ -534,7 +534,7 @@ This implementation plan breaks down the AI Content Generator feature into discr
     - Verify post scheduled via createPost
     - _Requirements: 10.1, 10.2, 10.3, 10.5, 15.1, 15.4_
 
-  - [~] 24.2 Test auto-schedule workflow
+  - [ ] 24.2 Test auto-schedule workflow
     - Configure auto-schedule with themes
     - Generate batch of drafts
     - Review drafts in queue

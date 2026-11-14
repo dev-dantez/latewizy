@@ -14,6 +14,7 @@ export function createLateClient(apiKey?: string): Late {
 
   return new Late({
     apiKey: key,
+    baseURL: "https://zernio.com/api",
   });
 }
 

@@ -195,7 +195,11 @@ const postingTimeSchema = z
   .string()
   .regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Posting time must be in HH:MM format");
 
-export const autoScheduleConfigSchema = z.object({
+/**
+ * Base object shape for auto-schedule config (without cross-field refinements).
+ * Used for partial updates where individual fields are optional.
+ */
+const autoScheduleConfigBaseSchema = z.object({
   enabled: z.boolean(),
   frequency: z.enum(["daily", "every-other-day", "weekly", "custom"]),
   postsPerWeek: z
@@ -236,7 +240,9 @@ export const autoScheduleConfigSchema = z.object({
       { message: "End date must be a valid ISO date string" }
     )
     .optional(),
-}).refine(
+});
+
+export const autoScheduleConfigSchema = autoScheduleConfigBaseSchema.refine(
   (data) => {
     // Validate that start date is today or future
     const today = new Date();
@@ -266,8 +272,10 @@ export const autoScheduleConfigSchema = z.object({
 
 /**
  * Partial auto-schedule config schema for updates (all fields optional).
+ * Uses the base schema (without cross-field refinements) so .partial() works
+ * in Zod v4, which disallows .partial() on refined schemas.
  */
-export const partialAutoScheduleConfigSchema = autoScheduleConfigSchema.partial();
+export const partialAutoScheduleConfigSchema = autoScheduleConfigBaseSchema.partial();
 
 // ============================================================================
 // API Request Schemas

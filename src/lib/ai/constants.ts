@@ -269,10 +269,11 @@ export const DEFAULT_IMAGE_MODEL = "flux" as const;
 
 /**
  * Groq model identifiers.
+ * Use models available on the free tier of this account.
  */
 export const GROQ_MODELS = {
-  LLAMA_3_3_70B: "llama-3.3-70b-versatile",
-  LLAMA_3_1_8B: "llama-3.1-8b-instant",
+  LLAMA_3_3_70B: "openai/gpt-oss-20b",
+  LLAMA_3_1_8B: "openai/gpt-oss-20b",   // fallback — same model, still recovers on transient errors
 } as const;
 
 // ============================================================================

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import Late from "@getlatedev/node";
+import { createLateClient } from "@/lib/late-api/client";
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const late = new Late({ apiKey });
+    const late = createLateClient(apiKey);
     const { data, error } = await late.usage.getUsageStats();
 
     if (error || !data) {
