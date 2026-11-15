@@ -25,7 +25,7 @@ export function ApiKeyModal({ open, onOpenChange }: ApiKeyModalProps) {
   const router = useRouter();
   const [apiKey, setApiKey] = useState("");
   const [isValidating, setIsValidating] = useState(false);
-  const { setApiKey: storeApiKey, setUsageStats } = useAuthStore();
+  const { addAccount, accounts } = useAuthStore();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,13 +57,15 @@ export function ApiKeyModal({ open, onOpenChange }: ApiKeyModalProps) {
         return;
       }
 
-      // Store the API key and usage stats
-      storeApiKey(trimmedKey);
-      setUsageStats(result.data);
+      addAccount(trimmedKey, result.data);
 
+      const isFirstAccount = accounts.length === 0;
       toast.success(`Connected to ${result.data.planName} plan`);
       onOpenChange(false);
-      router.push("/dashboard");
+      setApiKey("");
+      if (isFirstAccount) {
+        router.push("/dashboard");
+      }
     } catch (err) {
       console.error("API key validation error:", err);
       toast.error("Failed to validate API key. Please try again.");
@@ -78,11 +80,10 @@ export function ApiKeyModal({ open, onOpenChange }: ApiKeyModalProps) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Key className="h-5 w-5" />
-            Connect your Zernio API Key
+            Add Zernio Account
           </DialogTitle>
           <DialogDescription>
-            Enter your Zernio API key to start scheduling posts across 13
-            platforms.
+            Enter a Zernio API key to add an account. You can add multiple accounts and switch between them.
           </DialogDescription>
         </DialogHeader>
 

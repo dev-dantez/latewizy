@@ -7,8 +7,7 @@ import { useAuthStore, useAppStore } from "@/stores";
 import { getTimezoneOptions } from "@/lib/timezones";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -27,17 +26,17 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Key, Moon, Sun, Globe, LogOut, ExternalLink } from "lucide-react";
+import { ApiKeyModal } from "@/components/shared/api-key-modal";
+import { Key, Moon, Sun, Globe, LogOut, ExternalLink, Plus, Trash2, Check } from "lucide-react";
+import { Label } from "@/components/ui/label";
 
 export default function SettingsPage() {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
-  const { apiKey, usageStats, logout } = useAuthStore();
+  const { accounts, activeAccountIndex, switchAccount, removeAccount, logout } = useAuthStore();
   const { timezone, setTimezone } = useAppStore();
+  const [showAddAccount, setShowAddAccount] = useState(false);
 
-  const [showApiKey, setShowApiKey] = useState(false);
-
-  // Compute timezone options - always includes user's browser timezone and current selection
   const timezoneOptions = useMemo(
     () => getTimezoneOptions(timezone),
     [timezone]
@@ -48,9 +47,8 @@ export default function SettingsPage() {
     router.push("/");
   };
 
-  const maskedApiKey = apiKey
-    ? `${apiKey.slice(0, 7)}${"•".repeat(20)}${apiKey.slice(-4)}`
-    : "";
+  const activeAccount = accounts[activeAccountIndex] ?? null;
+  const usageStats = activeAccount?.usageStats ?? null;
 
   return (
     <div className="mx-auto max-w-2xl space-y-4 sm:space-y-6">
@@ -58,90 +56,114 @@ export default function SettingsPage() {
       <div>
         <h1 className="text-xl sm:text-2xl font-bold">Settings</h1>
         <p className="text-muted-foreground">
-          Manage your account and preferences.
+          Manage your accounts and preferences.
         </p>
       </div>
 
-      {/* API Key */}
+      {/* Accounts */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
             <Key className="h-4 w-4" />
-            API Key
+            API Accounts
           </CardTitle>
           <CardDescription>
-            Your Zernio API key is used to connect to your Zernio account.
+            Each account uses a separate Zernio API key with its own limits.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Current API Key</Label>
-            <div className="flex gap-2">
-              <Input
-                type={showApiKey ? "text" : "password"}
-                value={showApiKey ? apiKey || "" : maskedApiKey}
-                readOnly
-                className="font-mono"
-              />
-              <Button
-                variant="outline"
-                onClick={() => setShowApiKey(!showApiKey)}
+          {accounts.map((acc, i) => {
+            const isActive = i === activeAccountIndex;
+            const stats = acc.usageStats;
+            return (
+              <div
+                key={acc.apiKey}
+                className={`rounded-lg border p-4 space-y-3 cursor-pointer transition-colors ${
+                  isActive ? "border-primary bg-muted/50" : "border-border hover:bg-muted/30"
+                }`}
+                onClick={() => switchAccount(i)}
               >
-                {showApiKey ? "Hide" : "Show"}
-              </Button>
-            </div>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {isActive && <Check className="h-4 w-4 text-primary shrink-0" />}
+                    <span className="font-medium text-sm">{acc.label}</span>
+                    {isActive && <Badge variant="secondary" className="text-[10px]">Active</Badge>}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-xs text-muted-foreground">
+                      {acc.apiKey.slice(0, 10)}…{acc.apiKey.slice(-4)}
+                    </span>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Remove Account</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Remove <strong>{acc.label}</strong> from this device?
+                            {accounts.length === 1 && " You will be signed out."}
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => {
+                              removeAccount(i);
+                              if (accounts.length === 1) router.push("/");
+                            }}
+                          >
+                            Remove
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </div>
+
+                {isActive && stats && (
+                  <div className="grid gap-1.5 text-xs text-muted-foreground">
+                    <div className="flex justify-between">
+                      <span>Uploads</span>
+                      <span className="text-foreground">
+                        {stats.limits.uploads < 0
+                          ? <>{stats.usage.uploads.toLocaleString()} / ∞</>
+                          : <>{stats.usage.uploads.toLocaleString()} / {stats.limits.uploads.toLocaleString()}</>}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Profiles</span>
+                      <span className="text-foreground">
+                        {stats.limits.profiles < 0
+                          ? <>{stats.usage.profiles.toLocaleString()} / ∞</>
+                          : <>{stats.usage.profiles.toLocaleString()} / {stats.limits.profiles.toLocaleString()}</>}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setShowAddAccount(true)} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Add Account
+            </Button>
+            <Button variant="outline" asChild>
+              <a href="https://zernio.com/dashboard/api-keys" target="_blank" rel="noopener noreferrer">
+                Get API Key
+                <ExternalLink className="ml-2 h-4 w-4" />
+              </a>
+            </Button>
           </div>
-
-          {usageStats && (
-            <div className="rounded-lg bg-muted p-4">
-              <div className="flex items-center justify-between">
-                <span className="font-medium">{usageStats.planName}</span>
-                <Button variant="link" size="sm" className="h-auto p-0" asChild>
-                  <a
-                    href="https://zernio.com/dashboard"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    Manage Plan
-                    <ExternalLink className="ml-1 h-3 w-3" />
-                  </a>
-                </Button>
-              </div>
-              <div className="mt-2 grid gap-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Uploads</span>
-                  <span>
-                    {usageStats.limits.uploads < 0 ? (
-                      <>{usageStats.usage.uploads.toLocaleString()} / ∞</>
-                    ) : (
-                      <>{usageStats.usage.uploads.toLocaleString()} / {usageStats.limits.uploads.toLocaleString()}</>
-                    )}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Profiles</span>
-                  <span>
-                    {usageStats.limits.profiles < 0 ? (
-                      <>{usageStats.usage.profiles.toLocaleString()} / ∞</>
-                    ) : (
-                      <>{usageStats.usage.profiles.toLocaleString()} / {usageStats.limits.profiles.toLocaleString()}</>
-                    )}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <Button variant="outline" asChild>
-            <a
-              href="https://zernio.com/dashboard/api-keys"
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Manage API Keys
-              <ExternalLink className="ml-2 h-4 w-4" />
-            </a>
-          </Button>
         </CardContent>
       </Card>
 
@@ -218,26 +240,25 @@ export default function SettingsPage() {
             Session
           </CardTitle>
           <CardDescription>
-            Manage your current session on this device.
+            Sign out of all accounts on this device.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <AlertDialog>
             <AlertDialogTrigger asChild>
-              <Button variant="outline">Sign Out</Button>
+              <Button variant="outline">Sign Out All</Button>
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>Sign Out</AlertDialogTitle>
                 <AlertDialogDescription>
-                  This will remove your API key from this device. You&apos;ll need
-                  to enter it again to use LateWiz.
+                  This will remove all {accounts.length} account{accounts.length !== 1 ? "s" : ""} from this device.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <AlertDialogAction onClick={handleLogout}>
-                  Sign Out
+                  Sign Out All
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
@@ -283,6 +304,8 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      <ApiKeyModal open={showAddAccount} onOpenChange={setShowAddAccount} />
     </div>
   );
 }

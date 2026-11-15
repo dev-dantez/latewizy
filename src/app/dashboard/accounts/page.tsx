@@ -2,12 +2,15 @@
 
 import { useState, useMemo } from "react";
 import { toast } from "sonner";
+import Late from "@getlatedev/node";
 import {
   useAccounts,
   useAccountsHealth,
   useConnectAccount,
   useDeleteAccount,
 } from "@/hooks";
+import { useAuthStore } from "@/stores";
+import { useCurrentProfileId } from "@/hooks";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +21,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,21 +41,29 @@ import {
 import { AccountAvatar } from "@/components/accounts";
 import { ConnectPlatformGrid } from "./_components/connect-platform-grid";
 import { getPlatformName, type Platform } from "@/lib/late-api";
-import { Users, Plus, Loader2, AlertCircle, RefreshCw, Trash2 } from "lucide-react";
+import { Users, Plus, Loader2, AlertCircle, RefreshCw, Trash2, UserCircle2 } from "lucide-react";
 
 export default function AccountsPage() {
   const [showConnectDialog, setShowConnectDialog] = useState(false);
   const [accountToDelete, setAccountToDelete] = useState<string | null>(null);
+  const { accounts, activeAccountIndex } = useAuthStore();
+  const currentProfileId = useCurrentProfileId();
+
+  // Which Zernio account to connect under (defaults to active)
+  const [connectAccountIndex, setConnectAccountIndex] = useState<number>(activeAccountIndex);
+  // Keep in sync when active account changes outside the dialog
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [connectingPlatform, setConnectingPlatform] = useState<Platform | undefined>();
 
   // Hooks for data fetching
   const { data: accountsData, isLoading } = useAccounts();
   const { data: healthData } = useAccountsHealth();
 
   // Mutations
-  const connectMutation = useConnectAccount();
   const deleteMutation = useDeleteAccount();
+  const connectMutation = useConnectAccount(); // used for reconnect (active account only)
 
-  const accounts = (accountsData?.accounts || []) as any[];
+  const socialAccounts = (accountsData?.accounts || []) as any[];
   const healthMap = useMemo(
     () => new Map<string, any>(
       healthData?.accounts?.map((a: any) => [a.accountId, a] as [string, any]) || []
@@ -53,9 +71,30 @@ export default function AccountsPage() {
     [healthData]
   );
 
+  const openConnectDialog = () => {
+    setConnectAccountIndex(activeAccountIndex);
+    setShowConnectDialog(true);
+  };
+
   const handleConnect = async (platform: Platform) => {
     try {
-      const data = await connectMutation.mutateAsync({ platform });
+      setIsConnecting(true);
+      setConnectingPlatform(platform);
+
+      // Build a client for the selected Zernio account (may differ from active)
+      const selectedZernioKey = accounts[connectAccountIndex]?.apiKey;
+      if (!selectedZernioKey) throw new Error("No API key for selected account");
+
+      const selectedProfileId = accounts[connectAccountIndex]?.defaultProfileId || currentProfileId;
+      if (!selectedProfileId) throw new Error("No profile selected for this account");
+
+      const late = new Late({ apiKey: selectedZernioKey, baseURL: "https://zernio.com/api" });
+      const redirectUrl = `${window.location.origin}/callback`;
+      const { data, error } = await late.connect.getConnectUrl({
+        path: { platform },
+        query: { profileId: selectedProfileId, redirect_url: redirectUrl, headless: true },
+      });
+      if (error) throw error;
       if (data?.authUrl) {
         window.location.href = data.authUrl;
       }
@@ -63,6 +102,21 @@ export default function AccountsPage() {
       const msg = (err as Error)?.message || "Failed to start connection. Please try again.";
       toast.error(msg);
       console.error("Connect error:", err);
+    } finally {
+      setIsConnecting(false);
+      setConnectingPlatform(undefined);
+    }
+  };
+
+  const handleReconnect = async (platform: Platform) => {
+    try {
+      const data = await connectMutation.mutateAsync({ platform });
+      if (data?.authUrl) {
+        window.location.href = data.authUrl;
+      }
+    } catch (err) {
+      const msg = (err as Error)?.message || "Failed to start reconnection.";
+      toast.error(msg);
     }
   };
 
@@ -77,7 +131,7 @@ export default function AccountsPage() {
     }
   };
 
-  const connectedPlatforms = new Set<string>(accounts.map((a: any) => a.platform as string));
+  const connectedPlatforms = new Set<string>(socialAccounts.map((a: any) => a.platform as string));
 
   return (
     <div className="mx-auto max-w-2xl space-y-4 sm:space-y-6">
@@ -98,10 +152,10 @@ export default function AccountsPage() {
               Connected Accounts
             </CardTitle>
             <CardDescription>
-              {accounts.length} {accounts.length === 1 ? "account" : "accounts"} connected
+              {socialAccounts.length} {socialAccounts.length === 1 ? "account" : "accounts"} connected
             </CardDescription>
           </div>
-          <Button size="sm" onClick={() => setShowConnectDialog(true)}>
+          <Button size="sm" onClick={openConnectDialog}>
             <Plus className="mr-1.5 h-4 w-4" />
             Connect New
           </Button>
@@ -109,10 +163,10 @@ export default function AccountsPage() {
         <CardContent className="space-y-3">
           {isLoading ? (
             <AccountsLoadingSkeleton />
-          ) : accounts.length === 0 ? (
-            <EmptyAccountsState onConnect={() => setShowConnectDialog(true)} />
+          ) : socialAccounts.length === 0 ? (
+            <EmptyAccountsState onConnect={openConnectDialog} />
           ) : (
-            accounts.map((account: any) => {
+            socialAccounts.map((account: any) => {
               const health = healthMap.get(account._id);
               const needsReconnect = health?.status === "needs_reconnect";
 
@@ -144,7 +198,7 @@ export default function AccountsPage() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleConnect(account.platform)}
+                        onClick={() => handleReconnect(account.platform)}
                         disabled={connectMutation.isPending}
                       >
                         <RefreshCw className="mr-1.5 h-3 w-3" />
@@ -173,15 +227,41 @@ export default function AccountsPage() {
           <DialogHeader>
             <DialogTitle>Connect a Social Account</DialogTitle>
             <DialogDescription>
-              Choose a platform to connect. You&apos;ll be redirected to authorize
-              access.
+              Choose a platform to connect. You&apos;ll be redirected to authorize access.
             </DialogDescription>
           </DialogHeader>
+
+          {/* Account selector — only shown when multiple Zernio API accounts exist */}
+          {accounts.length > 1 && (
+            <div className="flex items-center gap-3 rounded-lg border border-border bg-muted/50 px-3 py-2">
+              <UserCircle2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="text-sm text-muted-foreground whitespace-nowrap">Connect under:</span>
+              <Select
+                value={String(connectAccountIndex)}
+                onValueChange={(v) => setConnectAccountIndex(Number(v))}
+              >
+                <SelectTrigger className="h-8 flex-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {accounts.map((acc, i) => (
+                    <SelectItem key={acc.apiKey} value={String(i)}>
+                      <span className="font-medium">{acc.label}</span>
+                      <span className="ml-2 font-mono text-xs text-muted-foreground">
+                        {acc.apiKey.slice(0, 10)}…
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <ConnectPlatformGrid
             onConnect={handleConnect}
             connectedPlatforms={connectedPlatforms}
-            isConnecting={connectMutation.isPending}
-            connectingPlatform={connectMutation.variables?.platform}
+            isConnecting={isConnecting}
+            connectingPlatform={connectingPlatform}
           />
         </DialogContent>
       </Dialog>

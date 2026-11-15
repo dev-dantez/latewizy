@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLate } from "./use-late";
-import { useAppStore } from "@/stores";
+import { useAuthStore } from "@/stores";
 import { useEffect } from "react";
 
 export const profileKeys = {
@@ -9,11 +9,11 @@ export const profileKeys = {
 };
 
 /**
- * Hook to fetch all profiles
+ * Hook to fetch all profiles for the active Zernio account.
  */
 export function useProfiles() {
   const late = useLate();
-  const { defaultProfileId, setDefaultProfileId } = useAppStore();
+  const { activeProfileId, setActiveProfileId } = useAuthStore();
 
   const query = useQuery({
     queryKey: profileKeys.all,
@@ -26,23 +26,23 @@ export function useProfiles() {
     enabled: !!late,
   });
 
-  // Auto-set default profile if not set
+  // Auto-set default profile if not set for this account
   useEffect(() => {
-    if (query.data?.profiles?.length && !defaultProfileId) {
-      setDefaultProfileId(query.data.profiles[0]._id);
+    if (query.data?.profiles?.length && !activeProfileId) {
+      setActiveProfileId(query.data.profiles[0]._id);
     }
-  }, [query.data, defaultProfileId, setDefaultProfileId]);
+  }, [query.data, activeProfileId, setActiveProfileId]);
 
   return query;
 }
 
 /**
- * Hook to get the current profile ID (from store or first profile)
+ * Hook to get the current profile ID for the active Zernio account.
  */
 export function useCurrentProfileId(): string | undefined {
-  const { defaultProfileId } = useAppStore();
+  const { activeProfileId } = useAuthStore();
   const { data } = useProfiles();
-  return defaultProfileId || data?.profiles?.[0]?._id;
+  return activeProfileId || data?.profiles?.[0]?._id;
 }
 
 /**
