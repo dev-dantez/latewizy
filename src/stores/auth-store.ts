@@ -231,6 +231,7 @@ export const useAuthStore = create<AuthState>()(
             apiKey: legacy.apiKey,
             label: normalizeUsageStats(legacy.usageStats)?.planName ?? "Account 1",
             usageStats: normalizeUsageStats(legacy.usageStats),
+            defaultProfileId: null,
           };
           state.accounts = [migratedAccount];
           state.activeAccountIndex = 0;

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useTheme } from "next-themes";
-import { useAuthStore, useAppStore } from "@/stores";
+import { useAuthStore } from "@/stores";
 import { useProfiles } from "@/hooks";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
