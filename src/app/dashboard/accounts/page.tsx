@@ -97,7 +97,6 @@ export default function AccountsPage() {
       }
       if (!selectedProfileId) throw new Error("No profile found for this account. Make sure the API key is valid.");
 
-      const late = new Late({ apiKey: selectedZernioKey, baseURL: "https://zernio.com/api" });
       const redirectUrl = `${window.location.origin}/callback`;
       const { data, error } = await late.connect.getConnectUrl({
         path: { platform },
