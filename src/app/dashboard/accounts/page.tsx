@@ -10,7 +10,6 @@ import {
   useDeleteAccount,
 } from "@/hooks";
 import { useAuthStore } from "@/stores";
-import { useCurrentProfileId } from "@/hooks";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -47,7 +46,6 @@ export default function AccountsPage() {
   const [showConnectDialog, setShowConnectDialog] = useState(false);
   const [accountToDelete, setAccountToDelete] = useState<string | null>(null);
   const { accounts, activeAccountIndex } = useAuthStore();
-  const currentProfileId = useCurrentProfileId();
 
   // Which Zernio account to connect under (defaults to active)
   const [connectAccountIndex, setConnectAccountIndex] = useState<number>(activeAccountIndex);
@@ -85,8 +83,19 @@ export default function AccountsPage() {
       const selectedZernioKey = accounts[connectAccountIndex]?.apiKey;
       if (!selectedZernioKey) throw new Error("No API key for selected account");
 
-      const selectedProfileId = accounts[connectAccountIndex]?.defaultProfileId || currentProfileId;
-      if (!selectedProfileId) throw new Error("No profile selected for this account");
+      const late = new Late({ apiKey: selectedZernioKey, baseURL: "https://zernio.com/api" });
+
+      // Resolve the profile ID for the selected account.
+      // accounts[connectAccountIndex].defaultProfileId is set once the user has
+      // visited that account at least once. If it's null (e.g. a freshly added
+      // account that was never switched to), fetch profiles directly with its key.
+      let selectedProfileId = accounts[connectAccountIndex]?.defaultProfileId;
+      if (!selectedProfileId) {
+        const { data: profilesData, error: profilesError } = await late.profiles.listProfiles();
+        if (profilesError) throw profilesError;
+        selectedProfileId = profilesData?.profiles?.[0]?._id ?? null;
+      }
+      if (!selectedProfileId) throw new Error("No profile found for this account. Make sure the API key is valid.");
 
       const late = new Late({ apiKey: selectedZernioKey, baseURL: "https://zernio.com/api" });
       const redirectUrl = `${window.location.origin}/callback`;
