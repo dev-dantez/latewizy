@@ -24,7 +24,7 @@ import { useTheme } from "next-themes";
 
 export default function LandingPage() {
   const router = useRouter();
-  const { apiKey, hasHydrated } = useAuthStore();
+  const { accounts, hasHydrated } = useAuthStore();
   const { theme, setTheme } = useTheme();
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -35,10 +35,10 @@ export default function LandingPage() {
 
   // Redirect to dashboard if already authenticated
   useEffect(() => {
-    if (hasHydrated && apiKey) {
+    if (hasHydrated && accounts.length > 0) {
       router.push("/dashboard");
     }
-  }, [apiKey, hasHydrated, router]);
+  }, [accounts.length, hasHydrated, router]);
 
   // Don't render until hydrated to avoid flash
   if (!hasHydrated) {

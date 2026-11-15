@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useTheme } from "next-themes";
@@ -19,6 +19,7 @@ import {
 import { cn } from "@/lib/utils";
 import { getAvatarUrl } from "@/lib/avatar";
 import { Logo, ErrorBoundary } from "@/components/shared";
+import { ApiKeyModal } from "@/components/shared/api-key-modal";
 import {
   LayoutDashboard,
   PenSquare,
@@ -26,6 +27,8 @@ import {
   Users,
   ListOrdered,
   Layers,
+  BarChart2,
+  Inbox,
   Settings,
   Moon,
   Sun,
@@ -33,6 +36,8 @@ import {
   ChevronDown,
   Check,
   ExternalLink,
+  Plus,
+  UserCircle2,
 } from "lucide-react";
 
 const navItems = [
@@ -66,6 +71,16 @@ const navItems = [
     href: "/dashboard/brands",
     icon: Layers,
   },
+  {
+    label: "Analytics",
+    href: "/dashboard/analytics",
+    icon: BarChart2,
+  },
+  {
+    label: "Inbox",
+    href: "/dashboard/inbox",
+    icon: Inbox,
+  },
 ];
 
 export default function DashboardLayout({
@@ -75,20 +90,20 @@ export default function DashboardLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { apiKey, usageStats, logout, hasHydrated } = useAuthStore();
-  const { defaultProfileId, setDefaultProfileId } = useAppStore();
+  const { apiKey, usageStats, logout, hasHydrated, accounts, activeAccountIndex, activeProfileId, setActiveProfileId, switchAccount } = useAuthStore();
   const { theme, setTheme } = useTheme();
   const { data: profilesData } = useProfiles();
+  const [showAddAccount, setShowAddAccount] = useState(false);
 
   const profiles = profilesData?.profiles || [];
-  const currentProfile = profiles.find((p: any) => p._id === defaultProfileId) || profiles[0];
+  const currentProfile = profiles.find((p: any) => p._id === activeProfileId) || profiles[0];
 
   // Redirect to home if not authenticated (only after hydration)
   useEffect(() => {
-    if (hasHydrated && !apiKey) {
+    if (hasHydrated && accounts.length === 0) {
       router.push("/");
     }
-  }, [apiKey, hasHydrated, router]);
+  }, [accounts.length, hasHydrated, router]);
 
   const handleLogout = () => {
     logout();
@@ -96,7 +111,7 @@ export default function DashboardLayout({
   };
 
   // Don't render until hydrated to avoid flash
-  if (!hasHydrated || !apiKey) {
+  if (!hasHydrated || accounts.length === 0) {
     return null;
   }
 
@@ -231,7 +246,7 @@ export default function DashboardLayout({
                   {profiles.map((profile: any) => (
                     <DropdownMenuItem
                       key={profile._id}
-                      onClick={() => setDefaultProfileId(profile._id)}
+                      onClick={() => setActiveProfileId(profile._id)}
                       className="gap-2"
                     >
                       <div
@@ -239,7 +254,7 @@ export default function DashboardLayout({
                         style={{ backgroundColor: profile.color || '#888' }}
                       />
                       <span className="flex-1 truncate">{profile.name}</span>
-                      {profile._id === defaultProfileId && (
+                      {profile._id === activeProfileId && (
                         <Check className="h-4 w-4 text-primary" />
                       )}
                     </DropdownMenuItem>
@@ -274,10 +289,31 @@ export default function DashboardLayout({
                   />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuLabel className="text-xs">
-                  {usageStats?.planName || 'Account'}
-                </DropdownMenuLabel>
+              <DropdownMenuContent align="end" className="w-56">
+                {/* Account list */}
+                {accounts.map((acc, i) => (
+                  <DropdownMenuItem
+                    key={acc.apiKey}
+                    onClick={() => switchAccount(i)}
+                    className="gap-2"
+                  >
+                    <UserCircle2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <div className="flex-1 overflow-hidden">
+                      <p className="truncate text-sm">{acc.label}</p>
+                      <p className="truncate text-[10px] text-muted-foreground font-mono">
+                        {acc.apiKey.slice(0, 10)}…
+                      </p>
+                    </div>
+                    {i === activeAccountIndex && (
+                      <Check className="h-4 w-4 text-primary shrink-0" />
+                    )}
+                  </DropdownMenuItem>
+                ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setShowAddAccount(true)} className="gap-2 text-sm">
+                  <Plus className="mr-1 h-3 w-3" />
+                  Add Account
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild className="text-sm">
                   <a
@@ -298,10 +334,12 @@ export default function DashboardLayout({
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout} className="text-sm text-destructive">
                   <LogOut className="mr-2 h-3 w-3" />
-                  Sign Out
+                  Sign Out All
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+
+            <ApiKeyModal open={showAddAccount} onOpenChange={setShowAddAccount} />
           </div>
         </header>
 
