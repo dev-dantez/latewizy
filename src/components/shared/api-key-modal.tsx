@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useAuthStore } from "@/stores";
+import { useMigrateBrands } from "@/hooks/use-brands";
+import { useBrandStore } from "@/stores/brand-store";
 import {
   Dialog,
   DialogContent,
@@ -26,6 +28,8 @@ export function ApiKeyModal({ open, onOpenChange }: ApiKeyModalProps) {
   const [apiKey, setApiKey] = useState("");
   const [isValidating, setIsValidating] = useState(false);
   const { addAccount, accounts } = useAuthStore();
+  const migrateBrands = useMigrateBrands();
+  const storeBrands = useBrandStore((s) => s.brands);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,6 +62,12 @@ export function ApiKeyModal({ open, onOpenChange }: ApiKeyModalProps) {
       }
 
       addAccount(trimmedKey, result.data);
+
+      // Migrate localStorage brands to the server (fires-and-forgets;
+      // idempotent — server skips IDs that already exist)
+      if (storeBrands.length > 0) {
+        migrateBrands.mutate(storeBrands);
+      }
 
       const isFirstAccount = accounts.length === 0;
       toast.success(`Connected to ${result.data.planName} plan`);
@@ -100,8 +110,8 @@ export function ApiKeyModal({ open, onOpenChange }: ApiKeyModalProps) {
               autoComplete="off"
             />
             <p className="text-sm text-muted-foreground">
-              Your API key is stored locally in your browser and never sent to
-              our servers.
+              Your API key is validated against Zernio's servers and stored
+              encrypted in your session. It is never logged or shared.
             </p>
           </div>
 

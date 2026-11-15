@@ -149,6 +149,8 @@ CRITICAL RULES:
 - Every word you write goes directly onto ${platform}. Write accordingly.
 - Stay within ${constraints.maxCharacters} characters per post.
 - Each variant must have a genuinely different angle — not just rephrased.
+- Do not wrap captions in quotation marks, and do not label them ("Caption 1:", "Text:").
+- Use standard ASCII punctuation (a regular hyphen "-", not "–" or "‑"). Emojis are fine.
 `;
   
   // Ensure prompt doesn't exceed maximum length
@@ -201,14 +203,17 @@ export function buildUserPrompt(
 Write ${validNumVariants} finished ${constraints.platform} caption${validNumVariants > 1 ? "s" : ""} about the topic above.
 Separate each caption with a line containing only "===".
 
-Format for EACH caption:
-<the caption text — ready to post, within ${constraints.maxCharacters} characters>
+Format for EACH caption (exactly these three lines, in order):
+<the caption text — ready to post, ${constraints.maxCharacters} characters max>
 HASHTAGS: #Tag1 #Tag2${!constraints.supportsHashtags ? "\n(Do NOT include a HASHTAGS line — this platform does not support hashtags)" : ` (max ${constraints.maxHashtags})`}
 CTA: <call to action>
 
-Do not write anything before the first caption or after the last one.
-Do not number the captions. Do not add labels like "Variant 1:".
-Start writing the first caption immediately.`;
+Rules:
+- Output ONLY caption text + the HASHTAGS line + the CTA line. No labels, no quotes around the caption, no plan, no commentary.
+- Do not number captions or add labels like "Caption 1:" or "Text:".
+- Keep each caption within ${constraints.maxCharacters} characters — count as you write.
+- Use standard punctuation (regular hyphen "-", not "–" or "‑"). Emojis are fine.
+- Start with the first caption immediately. Nothing before it, nothing after the last CTA.`;
   
   // Ensure prompt doesn't exceed maximum length
   if (prompt.length > PROMPT_LIMITS.userPrompt) {

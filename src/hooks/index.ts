@@ -89,3 +89,67 @@ export {
   type UseBrandsReturn,
   type UseBrandActionsReturn,
 } from "./use-brands";
+
+// Analytics
+export {
+  useAnalytics,
+  usePostAnalytics,
+  useFollowerStats,
+  useLinkedInAggregateAnalytics,
+  useLinkedInPostAnalytics,
+  useYouTubeDailyViews,
+  analyticsKeys,
+} from "./use-analytics";
+
+// Inbox
+export {
+  useInboxComments,
+  usePostComments,
+  useReplyToPost,
+  useHideComment,
+  useUnhideComment,
+  useLikeComment,
+  useUnlikeComment,
+  useDeleteComment,
+  useInboxConversations,
+  useConversationMessages,
+  useSendMessage,
+  useArchiveConversation,
+  inboxKeys,
+  type CommentsFilter,
+  type ConversationsFilter,
+  type CommentItem,
+  type ConversationItem,
+  type ConversationMessage,
+  type PostComment,
+} from "./use-inbox";
+
+// Calendar entries (DB-backed planner)
+export {
+  useCalendarEntries,
+  useCalendarEntry,
+  useCreateCalendarEntry,
+  useUpdateCalendarEntry,
+  useDeleteCalendarEntry,
+  useApproveCalendarEntry,
+  calendarEntryKeys,
+  type CalendarEntry,
+  type CalendarEntryStatus,
+  type CalendarEntryPlatform,
+  type CreateCalendarEntryInput,
+  type UpdateCalendarEntryInput,
+} from "./use-calendar-entries";
+
+// Autopilot config
+export {
+  useAutopilotConfig,
+  useUpsertAutopilotConfig,
+  autopilotKeys,
+  type AutopilotUpsertInput,
+} from "./use-autopilot";
+
+// AI
+export {
+  useTrendingTopics,
+  aiKeys,
+} from "./use-ai";

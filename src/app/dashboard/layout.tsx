@@ -4,8 +4,11 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useTheme } from "next-themes";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { useAuthStore } from "@/stores";
 import { useProfiles } from "@/hooks";
+import { useServerBrands } from "@/hooks/use-brands";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -38,6 +41,7 @@ import {
   ExternalLink,
   Plus,
   UserCircle2,
+  Loader2,
 } from "lucide-react";
 
 const navItems = [
@@ -93,7 +97,12 @@ export default function DashboardLayout({
   const { apiKey, usageStats, logout, hasHydrated, accounts, activeAccountIndex, activeProfileId, setActiveProfileId, switchAccount } = useAuthStore();
   const { theme, setTheme } = useTheme();
   const { data: profilesData } = useProfiles();
+  const qc = useQueryClient();
   const [showAddAccount, setShowAddAccount] = useState(false);
+  const [switchingProfile, setSwitchingProfile] = useState<string | null>(null);
+
+  // Fetch brands from DB and hydrate the brand store
+  useServerBrands();
 
   const profiles = profilesData?.profiles || [];
   const currentProfile = profiles.find((p: any) => p._id === activeProfileId) || profiles[0];
@@ -105,9 +114,60 @@ export default function DashboardLayout({
     }
   }, [accounts.length, hasHydrated, router]);
 
-  const handleLogout = () => {
+  // Re-issue the server-side session cookie whenever the active API key changes.
+  // This covers two cases:
+  //   1. Page reload: Zustand rehydrates from localStorage but the HttpOnly cookie
+  //      may have expired — calling /api/validate-key re-sets it.
+  //   2. Account switch: a different apiKey becomes active, so the cookie must be
+  //      updated or API routes will reject with 401 ("Unauthorized").
+  useEffect(() => {
+    if (!apiKey) return;
+    fetch("/api/validate-key", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ apiKey }),
+    }).catch(() => {
+      // Non-fatal — the user will get a 401 on the next API call and can re-auth
+    });
+  }, [apiKey]);
+
+  const handleLogout = async () => {
+    // Clear server-side session cookie
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // Non-fatal — cookie will expire on its own
+    }
     logout();
     router.push("/");
+  };
+
+  // Switch the active Zernio profile: tells the server to find/create the
+  // workspace for that profile and re-issue the session JWT, then updates the
+  // client store and invalidates all workspace-scoped queries.
+  const handleProfileSwitch = async (profile: { _id: string; name?: string }) => {
+    if (profile._id === activeProfileId) return;
+    setSwitchingProfile(profile._id);
+    try {
+      const res = await fetch("/api/auth/switch-workspace-by-profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ zernioProfileId: profile._id }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error ?? "Failed to switch workspace");
+      }
+
+      setActiveProfileId(profile._id);
+      await qc.invalidateQueries();
+      toast.success(`Switched to ${profile.name ?? "workspace"}`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to switch workspace");
+    } finally {
+      setSwitchingProfile(null);
+    }
   };
 
   // Don't render until hydrated to avoid flash
@@ -246,7 +306,8 @@ export default function DashboardLayout({
                   {profiles.map((profile: any) => (
                     <DropdownMenuItem
                       key={profile._id}
-                      onClick={() => setActiveProfileId(profile._id)}
+                      onClick={() => handleProfileSwitch(profile)}
+                      disabled={switchingProfile !== null}
                       className="gap-2"
                     >
                       <div
@@ -254,7 +315,9 @@ export default function DashboardLayout({
                         style={{ backgroundColor: profile.color || '#888' }}
                       />
                       <span className="flex-1 truncate">{profile.name}</span>
-                      {profile._id === activeProfileId && (
+                      {switchingProfile === profile._id ? (
+                        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                      ) : profile._id === activeProfileId && (
                         <Check className="h-4 w-4 text-primary" />
                       )}
                     </DropdownMenuItem>

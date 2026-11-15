@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useAuthStore, useAppStore } from "@/stores";
+import { useBrands } from "@/hooks/use-brands";
 import { getTimezoneOptions } from "@/lib/timezones";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,6 +28,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { ApiKeyModal } from "@/components/shared/api-key-modal";
+import { AutopilotCard } from "./_components/autopilot-card";
+import { WorkspaceSwitcher } from "./_components/workspace-switcher";
 import { Key, Moon, Sun, Globe, LogOut, ExternalLink, Plus, Trash2, Check } from "lucide-react";
 import { Label } from "@/components/ui/label";
 
@@ -35,6 +38,7 @@ export default function SettingsPage() {
   const { theme, setTheme } = useTheme();
   const { accounts, activeAccountIndex, switchAccount, removeAccount, logout } = useAuthStore();
   const { timezone, setTimezone } = useAppStore();
+  const { activeBrands } = useBrands();
   const [showAddAccount, setShowAddAccount] = useState(false);
 
   const timezoneOptions = useMemo(
@@ -266,9 +270,26 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Workspaces */}
+      <WorkspaceSwitcher />
+
+      {/* Autopilot — one card per active brand */}
+      {activeBrands.length > 0 && (
+        <div className="space-y-4">
+          <div>
+            <h2 className="text-base font-semibold">Autopilot</h2>
+            <p className="text-sm text-muted-foreground">
+              Configure automated content generation per brand.
+            </p>
+          </div>
+          {activeBrands.map((brand) => (
+            <AutopilotCard key={brand.id} brand={brand} />
+          ))}
+        </div>
+      )}
+
       {/* About */}
-      <Card>
-        <CardContent className="pt-6">
+      <Card>        <CardContent className="pt-6">
           <div className="text-center text-sm text-muted-foreground">
             <p>LateWiz - Your social media scheduling wizard</p>
             <p className="mt-1">
