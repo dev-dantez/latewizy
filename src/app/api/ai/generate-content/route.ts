@@ -20,6 +20,15 @@ import { GROQ_MODELS, PROVIDER_RATE_LIMITS } from "@/lib/ai/constants";
 import type { ContentVariant, GenerateContentResponse } from "@/types/ai";
 
 /**
+ * Max completion tokens for caption generation. gpt-oss is a reasoning model:
+ * even with `include_reasoning: false` it still spends tokens "thinking" before
+ * writing the captions, so the 1024 Groq default truncates the final answer and
+ * only the chain-of-thought comes back. 3072 leaves room for reasoning + three
+ * finished captions.
+ */
+const GENERATION_MAX_TOKENS = 3072;
+
+/**
  * Groq API chat completion request interface.
  */
 interface GroqChatMessage {
@@ -33,6 +42,8 @@ interface GroqChatCompletionRequest {
   temperature?: number;
   max_tokens?: number;
   stream?: boolean;
+  /** gpt-oss is a reasoning model; false omits the chain-of-thought so `content` holds only the answer. */
+  include_reasoning?: boolean;
 }
 
 interface GroqChatCompletionResponse {
@@ -61,12 +72,13 @@ interface GroqStreamChunk {
 
 /**
  * Extract the usable text from a Groq response choice.
- * Standard models use `content`; reasoning models put output in `reasoning`.
+ * gpt-oss reasoning models put chain-of-thought in `reasoning` and the final
+ * answer in `content`. We request `include_reasoning: false` so only `content`
+ * is returned. Never fall back to `reasoning` — that is the model's scratchpad
+ * ("Let's craft…", "We need to produce 3 captions…"), not postable content.
  */
 function extractResponseText(choice: GroqChatCompletionResponse["choices"][0]): string {
-  const content = choice.message.content?.trim() ?? "";
-  if (content.length > 0) return content;
-  return choice.message.reasoning?.trim() ?? "";
+  return choice.message.content?.trim() ?? "";
 }
 
 /**
@@ -98,7 +110,15 @@ async function callGroqAPI(
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) throw new Error("GROQ_API_KEY environment variable is not set");
 
-  const requestBody: GroqChatCompletionRequest = { model, messages, temperature, max_tokens: maxTokens };
+  const requestBody: GroqChatCompletionRequest = {
+    model,
+    messages,
+    temperature,
+    max_tokens: maxTokens,
+    // gpt-oss is a reasoning model: suppress the chain-of-thought so `content`
+    // contains only the finished captions (no "Let's craft…" meta-text).
+    include_reasoning: false,
+  };
 
   const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
     method: "POST",
@@ -174,6 +194,8 @@ async function streamGroqResponse(
         temperature,
         max_tokens: maxTokens,
         stream: true,
+        // Suppress reasoning tokens in the stream too — only caption text reaches the client.
+        include_reasoning: false,
       }),
     });
   } catch {
@@ -209,8 +231,9 @@ async function streamGroqResponse(
             }
             try {
               const chunk = JSON.parse(data) as GroqStreamChunk;
-              // reasoning models stream into delta.reasoning; standard into delta.content
-              const token = chunk.choices?.[0]?.delta?.content ?? chunk.choices?.[0]?.delta?.reasoning ?? "";
+              // Only stream the finished answer. With include_reasoning:false no
+              // reasoning deltas arrive, but never stream them even if they did.
+              const token = chunk.choices?.[0]?.delta?.content ?? "";
               if (token) {
                 controller.enqueue(encoder.encode(`data: ${JSON.stringify(token)}\n\n`));
               }
@@ -262,14 +285,43 @@ function buildRateLimitHeaders(provider: "groq", clientIP: string): Record<strin
  *   HASHTAGS: #tag1 #tag2
  *   CTA: some call to action
  *   ===
+ *
+ * Also scrubs residual meta-text (labels like "Caption 1:", wrapping quotes) so
+ * the displayed content is publish-ready even if the model strays from format.
  */
+
+/** A line that is ONLY a label the model sometimes prepends, e.g. "Caption 1:" or "Text:". */
+const STANDALONE_LABEL_RE = /^\s*(caption|variant|option|post|draft|text|copy|body)\s*\d*\s*[:\-—.]\s*$/i;
+
+/** A leading inline label prefix on the caption line itself, e.g. "Caption 1: …". */
+const INLINE_LABEL_PREFIX_RE = /^\s*(caption|variant|option|post|draft)\s*\d+\s*[:\-—.]\s*/i;
+
+/** Strip one layer of matching wrapping quotes ("…" '…' "…" '…'). */
+function stripWrappingQuotes(s: string): string {
+  const t = s.trim();
+  if (t.length < 2) return t;
+  const pairs: Array<[string, string]> = [
+    ['"', '"'],
+    ["'", "'"],
+    ["\u201C", "\u201D"],
+    ["\u2018", "\u2019"],
+  ];
+  for (const [open, close] of pairs) {
+    if (t.startsWith(open) && t.endsWith(close)) return t.slice(1, -1).trim();
+  }
+  return t;
+}
+
 function parsePlainTextVariants(
   text: string,
   platform: string,
   brandDefaultCTA: string
 ): ContentVariant[] {
   const constraints = getPlatformConstraints(platform as never);
-  const blocks = text.split(/\n\s*===\s*\n?/).map((b) => b.trim()).filter(Boolean);
+  const blocks = text
+    .split(/\n\s*(?:===|---|\*\*\*)\s*\n?/)
+    .map((b) => b.trim())
+    .filter(Boolean);
   const variants: ContentVariant[] = [];
 
   for (const block of blocks) {
@@ -277,11 +329,23 @@ function parsePlainTextVariants(
     const hashtagLine = lines.find((l) => l.trim().toUpperCase().startsWith("HASHTAGS:"));
     const ctaLine = lines.find((l) => l.trim().toUpperCase().startsWith("CTA:"));
 
-    // Content = all lines except HASHTAGS: and CTA: lines
-    const contentLines = lines.filter(
-      (l) => l !== hashtagLine && l !== ctaLine
+    // Content = everything except the HASHTAGS/CTA lines and standalone labels.
+    let contentLines = lines.filter(
+      (l) => l !== hashtagLine && l !== ctaLine && !STANDALONE_LABEL_RE.test(l)
     );
-    const content = contentLines.join("\n").trim();
+    // Drop a leading inline label prefix ("Caption 1:") on the first real line.
+    if (contentLines.length > 0) {
+      contentLines = contentLines.map((l, i) =>
+        i === 0 ? l.replace(INLINE_LABEL_PREFIX_RE, "") : l
+      );
+    }
+    // Trim each line, drop empties and stray quote-only lines at the edges.
+    contentLines = contentLines
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0 && !/^["“”']+$/.test(l));
+
+    let content = contentLines.join("\n").trim();
+    content = stripWrappingQuotes(content);
 
     if (!content) continue;
 
@@ -446,13 +510,13 @@ export async function POST(request: NextRequest) {
     // Streaming mode — client passes ?stream=true
     const wantsStream = request.nextUrl.searchParams.get("stream") === "true";
     if (wantsStream) {
-      return streamGroqResponse(messages, 0.7, 1024);
+      return streamGroqResponse(messages, 0.7, GENERATION_MAX_TOKENS);
     }
 
     // Non-streaming with fallback
     let groqResponse: GroqChatCompletionResponse;
     try {
-      groqResponse = await callGroqWithFallback(messages, 0.7, 1024);
+      groqResponse = await callGroqWithFallback(messages, 0.7, GENERATION_MAX_TOKENS);
     } catch (error) {
       console.error("Groq API call failed:", error);
       const userMessage =
